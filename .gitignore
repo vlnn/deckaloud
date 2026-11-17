@@ -8,3 +8,4 @@ samples/
 .DS_Store
 .coverage
 deckaloud.toml
+decks/

@@ -1,0 +1,21 @@
+[project]
+name = "deckaloud"
+version = "0.1.0"
+description = "Sound-first Anki deck generator: text files in, a listenable .apkg out"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["genanki>=0.13"]
+
+[project.scripts]
+deckaloud = "deckaloud.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-mock>=3.14"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["macos: needs the real say and afconvert commands"]

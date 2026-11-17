@@ -1,0 +1,16 @@
+deck: Listening::Networking
+lang: en
+
+id: 3f9a1c20
+Q: What does the TCP three-way handshake establish?
+A: Initial sequence numbers for both directions of the connection.
+
+id: 8b2e77d1
+Q: Which three segments make up the handshake, in order?
+A: Three segments: SYN, then SYN-ACK, then ACK.
+
+id: c41d09ee
+C: TCP guarantees {{c1::ordered}} and {{c2::reliable}} delivery, while UDP guarantees {{c3::neither::how many of the two}}.
+
+id: 5a60f3b7
+C: A TCP connection is identified by {{c1::four}} values: source address, {{c2::source port}}, destination address and {{c2::destination port}}.

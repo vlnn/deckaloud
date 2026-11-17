@@ -1,0 +1,26 @@
+engine = "say"
+
+[gap]
+style = "blank"
+
+[pauses]
+cloze_answer = 0.6
+lead_in = 0.25
+tail = 0.5
+
+[tone]
+frequency = 880
+duration = 0.25
+padding = 0.15
+
+[languages.en]
+voice = "Samantha"
+locale = "en_US"
+rate = 175
+gap_word = "blank"
+
+[languages.uk]
+voice = "Lesya"
+locale = "uk_UA"
+rate = 165
+gap_word = "пропуск"

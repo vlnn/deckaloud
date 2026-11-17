@@ -16,3 +16,7 @@ class ConfigError(DeckaloudError):
 
 class SpeechError(DeckaloudError):
     pass
+
+
+class PackageError(DeckaloudError):
+    pass

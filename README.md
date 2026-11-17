@@ -53,7 +53,42 @@ deckaloud check  notes/*.txt                  # validate, render nothing
 deckaloud sample notes/*.txt -n 3             # 3 cards per language, both sides, in every natural voice
 deckaloud build  notes/*.txt -o listening.apkg
 deckaloud build  --stamp notes/*.txt          # stamp, then build
+deckaloud voice  mydeck.apkg                  # add sound to an existing deck
 ```
+
+## Adding sound to a deck you already have
+
+```sh
+deckaloud voice mydeck.apkg                  # writes mydeck-voiced.apkg
+deckaloud voice mydeck.apkg -o spoken.apkg --lang uk --max-chars 400
+```
+
+`voice` reads an existing package, appends a baked clip to every field it can
+speak, and writes a new package. Nothing else changes: note types, cards,
+scheduling and existing media are carried over as they are. Import the result
+over the deck you study and the notes update in place, keeping their schedule.
+
+Export the deck from Anki with **Support older Anki versions** ticked. Anki's
+newer package format is refused with a message saying so.
+
+A field is left exactly as it was, and counted in the report, when it:
+
+- already has a sound tag, or is already spoken by a `{{tts}}` tag in the template;
+- holds the cloze text, because audio there would give the answer away (other
+  fields of a cloze note, such as Back Extra, are voiced);
+- is not shown on any card, or sits behind a hint;
+- contains a formula, is longer than `--max-chars` (default 600), or is written
+  in a script no configured voice reads;
+- could not be rendered (voice not installed, engine failure).
+
+The voice is chosen per field the same way as for source files; `--lang` plays
+the part of the file language. Running `voice` on its own output changes nothing.
+
+The audio sits in the fields, so it plays wherever the field is shown. With
+Anki's stock note types the question clip plays on the front and only the
+answer clip on the back. A note type whose answer template repeats the question
+field, instead of using `{{FrontSide}}`, will play the question clip again
+there; the report names those note types.
 
 `build` refuses cards without an id instead of inventing one, because an id that
 changes later would turn a reviewed card into a new one. It only edits your files
@@ -159,6 +194,8 @@ rather than from anything this project tests:
 - A cloze answer cannot contain `::`, as in Anki itself: the part after it is
   read as the hint.
 - Each cloze deletion is its own note, so Anki does not bury siblings.
+- `voice` cannot give cloze cards a spoken question, and reads only packages
+  exported for older Anki versions.
 - Importing never deletes cards, and `.deckaloud/audio` is never pruned. Delete
   the folder to start the cache afresh.
 - Card text is shown as plain text; HTML in a source file is escaped, not rendered.

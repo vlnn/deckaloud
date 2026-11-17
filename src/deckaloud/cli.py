@@ -1,4 +1,5 @@
 import argparse
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from deckaloud.sample import (
 )
 from deckaloud.source import SourceFile, parse_source
 from deckaloud.stamp import stamp_file
+from deckaloud.voiceover import VoiceOptions, format_voice_report, voice_package
 from deckaloud.voicing import voice_cards
 
 STATE_DIR = Path(".deckaloud")
@@ -32,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         return args.run(args)
-    except (DeckaloudError, OSError) as error:
+    except (DeckaloudError, OSError, sqlite3.Error) as error:
         return failure([str(error)])
 
 
@@ -41,6 +43,7 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(required=True)
     add_build(commands)
     add_sample(commands)
+    add_voice(commands)
     add_command(commands, "stamp", run_stamp, "write missing card ids into the source files")
     add_command(commands, "check", run_check, "validate source files without rendering audio")
     return root
@@ -65,6 +68,24 @@ def add_sample(commands) -> None:
     command.add_argument("-o", "--output", type=Path, default=DEFAULT_SAMPLES)
     command.add_argument("-n", "--count", type=int, default=3, help="cards to sample per language, both sides of each")
     command.add_argument("--all-voices", action="store_true", help="include effect and synthetic voices")
+
+
+def add_voice(commands) -> None:
+    command = commands.add_parser("voice", help="add spoken audio to an existing .apkg")
+    command.add_argument("package", type=Path)
+    command.add_argument("-o", "--output", type=Path, help="default: <package>-voiced.apkg")
+    command.add_argument("--lang", default="en", help="language of text whose script does not decide it")
+    command.add_argument("--max-chars", type=int, default=600, help="skip fields longer than this")
+    command.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    command.set_defaults(run=run_voice)
+
+
+def run_voice(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    output = args.output or args.package.with_name(f"{args.package.stem}-voiced.apkg")
+    options = VoiceOptions(default_lang=args.lang, max_chars=args.max_chars)
+    print(format_voice_report(voice_package(args.package, output, studio(config), options), output))
+    return 0
 
 
 def run_build(args: argparse.Namespace) -> int:

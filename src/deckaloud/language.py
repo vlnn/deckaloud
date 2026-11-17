@@ -1,7 +1,7 @@
 import re
 
 CYRILLIC = re.compile(r"[\u0400-\u04FF]")
-LATIN = re.compile(r"[A-Za-z]")
+LATIN = re.compile(r"[A-Za-z\u00C0-\u024F]")
 CYRILLIC_LANGUAGES = frozenset({"uk", "ru", "be", "bg", "sr", "mk", "kk", "ky", "mn", "tg"})
 FALLBACK_BY_SCRIPT = {"cyrillic": "uk", "latin": "en"}
 
@@ -23,3 +23,8 @@ def script_of(text: str) -> str | None:
 
 def script_written_by(language: str) -> str:
     return "cyrillic" if language in CYRILLIC_LANGUAGES else "latin"
+
+
+def has_unvoiced_script(text: str) -> bool:
+    letters = [character for character in text if character.isalpha()]
+    return bool(letters) and script_of("".join(letters)) is None

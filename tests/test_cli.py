@@ -174,3 +174,43 @@ def test_build_without_cards_fails_and_writes_nothing(project, capsys):
     assert code == 1, "building nothing should fail"
     assert "no cards" in capsys.readouterr().err, "the failure should say there were no cards"
     assert not Path("deckaloud.apkg").exists(), "no package should be written"
+
+
+DATA = Path(__file__).parent / "data"
+
+
+def test_voice_adds_sound_to_an_existing_package(project, capsys):
+    code = main(["voice", str(DATA / "anki_legacy_export.apkg"), "-o", "spoken.apkg"])
+
+    assert code == 0, "voicing a legacy export should succeed"
+    assert zipfile.is_zipfile(project / "spoken.apkg"), "the voiced package should be written"
+    assert "Voiced 8 fields in 5 of 6 notes into spoken.apkg." in capsys.readouterr().out, "the report should be printed"
+
+
+def test_voice_names_its_output_after_the_input_by_default(project):
+    source = project / "deck.apkg"
+    source.write_bytes((DATA / "anki_legacy_export.apkg").read_bytes())
+
+    main(["voice", str(source)])
+
+    assert (project / "deck-voiced.apkg").exists(), "the default output should sit beside the input with a -voiced suffix"
+
+
+@pytest.mark.parametrize(
+    "arguments, fragment",
+    [
+        (["voice", str(DATA / "anki_modern_export.apkg")], "Support older Anki versions"),
+        (["voice", "absent.apkg"], "absent.apkg"),
+        (["voice", str(DATA / "anki_legacy_export.apkg"), "--lang", "de"], None),
+    ],
+)
+def test_voice_reports_problems_plainly(project, capsys, arguments, fragment):
+    code = main(arguments)
+
+    captured = capsys.readouterr()
+    if fragment is None:
+        assert code == 0, "an unconfigured default language should not stop the run"
+        assert "no voice configured for language 'de'" in captured.out, "the skipped fields should say why"
+    else:
+        assert code == 1, f"{arguments} should fail"
+        assert fragment in captured.err, f"the error should mention {fragment}"

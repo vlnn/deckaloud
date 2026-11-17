@@ -7,3 +7,4 @@ samples/
 *.apkg
 .DS_Store
 .coverage
+deckaloud.toml

@@ -4,7 +4,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from deckaloud.source import CARD_KEYS, Block, block_keys, split_blocks
+from deckaloud.source import CARD_KEYS, Block, block_keys, read_source_text, split_blocks
 
 
 def random_id() -> str:
@@ -30,7 +30,7 @@ def trailing_newline(text: str) -> str:
 
 
 def stamp_file(path: Path, new_id: Callable[[], str] = random_id) -> int:
-    stamped, added = stamp_text(path.read_text(encoding="utf-8-sig"), new_id)
+    stamped, added = stamp_text(read_source_text(path), new_id)
     if added:
         write_atomically(path, stamped)
     return added

@@ -10,6 +10,10 @@ class ParseError(DeckaloudError):
         super().__init__(f"{path}:{line}: {message}")
 
 
+class SourceError(DeckaloudError):
+    pass
+
+
 class ConfigError(DeckaloudError):
     pass
 

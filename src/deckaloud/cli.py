@@ -18,7 +18,7 @@ from deckaloud.sample import (
     sampled_sides,
     silent_languages,
 )
-from deckaloud.source import SourceFile, parse_source
+from deckaloud.source import SourceFile, parse_source, read_source_text
 from deckaloud.stamp import stamp_file
 from deckaloud.voiceover import VoiceOptions, format_voice_report, voice_package
 from deckaloud.voicing import voice_cards
@@ -146,7 +146,7 @@ def stamp_files(paths: list[Path]) -> None:
 
 
 def read_sources(paths: list[Path]) -> tuple[SourceFile, ...]:
-    return tuple(parse_source(path.read_text(encoding="utf-8-sig"), path) for path in paths)
+    return tuple(parse_source(read_source_text(path), path) for path in paths)
 
 
 def all_cards(sources: tuple[SourceFile, ...], config: Config) -> tuple[Card, ...]:

@@ -203,6 +203,38 @@ def test_source_with_a_byte_order_mark_is_read(project):
     assert main(["check", "bom.txt"]) == 0, "a byte-order mark should not break parsing"
 
 
+def write_package_bytes(project, name):
+    path = project / name
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(zipfile.ZipInfo("collection.anki2"), b"\xff\xfe not text")
+    return path
+
+
+@pytest.mark.parametrize("command", ["build", "check", "sample", "stamp"])
+def test_anki_package_given_as_a_source_points_to_the_voice_command(project, capsys, command):
+    package = write_package_bytes(project, "deck.apkg")
+    before = package.read_bytes()
+
+    code = main([command, str(package)])
+
+    error = capsys.readouterr().err
+    assert code == 1, f"{command} should refuse an Anki package"
+    assert error.startswith("error: ") and error.count("\n") == 1, "the refusal should be a one-line error"
+    assert f"deckaloud voice {package}" in error, "the refusal should name the command that takes packages"
+    assert package.read_bytes() == before, "the package should be left as it was"
+
+
+@pytest.mark.parametrize("command", ["build", "check", "sample", "stamp"])
+def test_source_that_is_not_utf8_text_is_reported_without_a_traceback(project, capsys, command):
+    (project / "notes.txt").write_bytes("Q: Столиця?\nA: Київ.\n".encode("cp1251"))
+
+    code = main([command, "notes.txt"])
+
+    error = capsys.readouterr().err
+    assert code == 1, f"{command} should refuse a file it cannot decode"
+    assert error.startswith("error: notes.txt") and "UTF-8" in error, "the failure should name the file and the encoding it needs"
+
+
 def test_build_without_cards_fails_and_writes_nothing(project, capsys):
     code = main(["build", write(project, "empty.txt", "deck: Empty\n")])
 

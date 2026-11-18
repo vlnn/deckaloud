@@ -1,10 +1,11 @@
 import re
+import zipfile
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 
 from deckaloud.cloze import deletion_numbers, parse_cloze
-from deckaloud.errors import ParseError
+from deckaloud.errors import ParseError, SourceError
 
 FIELD = re.compile(r"^(deck|lang|id|Q|A|C):\s*(.*)$")
 CARD_KEYS = frozenset({"Q", "A", "C"})
@@ -44,6 +45,19 @@ class SourceFile:
     deck: str
     lang: str
     entries: tuple[Entry, ...]
+
+
+def read_source_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        raise SourceError(unreadable(path)) from None
+
+
+def unreadable(path: Path) -> str:
+    if zipfile.is_zipfile(path):
+        return f"{path} is an Anki package, not a source file; add sound to it with 'deckaloud voice {path}'"
+    return f"{path} is not UTF-8 text, so it cannot be read as a source file"
 
 
 def parse_source(text: str, path: Path) -> SourceFile:

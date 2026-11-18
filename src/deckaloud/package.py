@@ -6,6 +6,7 @@ from pathlib import Path
 import genanki
 
 from deckaloud.config import MAX_LANGUAGES, Config, Language
+from deckaloud.replay import replay_script
 from deckaloud.speech import plain_text
 from deckaloud.voicing import VoicedCard, VoicedSide
 
@@ -28,7 +29,7 @@ def write_package(voiced: tuple[VoicedCard, ...], config: Config, output: Path) 
 
 
 def decks(voiced: tuple[VoicedCard, ...], config: Config) -> list[genanki.Deck]:
-    model = listening_model(config.languages)
+    model = listening_model(config)
     by_name = {name: genanki.Deck(stable_id("deck", name), name) for name in deck_names(voiced)}
     for item in voiced:
         by_name[item.card.deck].add_note(note(item, model, config))
@@ -49,25 +50,27 @@ def stable_id(*parts: str) -> int:
     return (1 << 30) + int(digest[:8], 16) % (1 << 30)
 
 
-def listening_model(languages: Mapping[str, Language]) -> genanki.Model:
+def listening_model(config: Config) -> genanki.Model:
     return genanki.Model(
         stable_id("model", MODEL_VERSION),
         "deckaloud listening",
         fields=[{"name": name} for name in FIELD_NAMES],
-        templates=[
-            {"name": "Listen", "qfmt": front_template(languages), "afmt": back_template(languages)}
-        ],
+        templates=[{"name": "Listen", "qfmt": front_template(config), "afmt": back_template(config)}],
         css=STYLE,
     )
 
 
-def front_template(languages: Mapping[str, Language]) -> str:
-    return "<div>{{Front}}</div>{{FrontAudio}}" + runtime_speech("Front", languages)
+def front_template(config: Config) -> str:
+    return "<div>{{Front}}</div>{{FrontAudio}}" + spoken_and_replayable("Front", config)
 
 
-def back_template(languages: Mapping[str, Language]) -> str:
+def back_template(config: Config) -> str:
     shown = "<div>{{Front}}</div><hr id=answer><div>{{Back}}</div>"
-    return shown + "{{BackAudio}}" + runtime_speech("Back", languages)
+    return shown + "{{BackAudio}}" + spoken_and_replayable("Back", config)
+
+
+def spoken_and_replayable(side: str, config: Config) -> str:
+    return runtime_speech(side, config.languages) + replay_script(config.replay_keys)
 
 
 def runtime_speech(side: str, languages: Mapping[str, Language]) -> str:

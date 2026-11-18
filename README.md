@@ -125,6 +125,9 @@ frequency = 880
 duration = 0.25
 padding = 0.15
 
+[keys]
+replay = ["4"]             # keys that replay the side being shown; [] for none
+
 [languages.en]
 voice = "Samantha"
 locale = "en_US"
@@ -146,6 +149,33 @@ words still go missing; changing them re-renders every clip.
 With `style = "tone"` the sentence is spoken in pieces around the tone, so the
 intonation is choppier than with the spoken gap word.
 
+## Replay key
+
+Rings and remotes made for Anki send the review keys (Space, 1, 2, 4), and none
+of those replays the audio. AnkiMobile cannot rebind keys, so the cards do it
+themselves: a small script in the card template listens for the keys listed in
+`[keys] replay` and presses the play button of the side being shown. The default
+is `4`.
+
+```toml
+[keys]
+replay = ["4", "r"]        # several keys
+# replay = "2"             # one key
+# replay = []              # none: the cards carry no script
+```
+
+Keys are named the way browsers name them: `"4"`, `"r"`, `"ArrowUp"`.
+
+The script is tested in a browser-like page and through a real Anki import, not
+inside the Anki apps, so try it with your remote before relying on it:
+
+- It only hears a key the app passes on to the card. On the answer side Anki
+  may grade the card instead of replaying it, or as well: `4` is Easy there.
+- Anki's desktop app is expected to keep 1–4 for itself. R replays there anyway.
+- It presses the play button Anki draws next to the audio, so that button has to
+  be shown (desktop: Preferences → Review → Show play buttons on cards with audio).
+- `voice` leaves note types as they are, so decks voiced that way do not get it.
+
 ## Voices
 
 The voices macOS ships with are the compact ones. The Enhanced and Premium
@@ -166,10 +196,12 @@ you when a language in your files has no installed voice at all.
 
 Rebuild and import the new `.apkg` over the old one. Notes are matched by id, so
 edited cards keep their schedule and new cards are added. In Anki's import
-dialog leave "Update notes" on "If newer".
+dialog leave "Update notes" and "Update note types" on "If newer".
 
-Changing voices, pauses or the language list is safe between builds: the note
-type keeps the same identity and fields whatever the settings are.
+Changing voices, pauses, replay keys or the language list is safe between
+builds: the note type keeps the same identity and fields whatever the settings
+are. The replay keys live in the note type, so a deck you already study gets
+them, or a new choice of keys, with the next import.
 
 ## Anki settings worth checking
 
@@ -209,3 +241,5 @@ uv run --with anki python scripts/verify_import.py first.apkg second.apkg
 
 The second command imports packages into a throwaway Anki collection and prints
 the cards, which is how import and update behaviour was checked.
+
+The replay script's tests run it under `node` and are skipped when it is missing.

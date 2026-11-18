@@ -25,7 +25,7 @@ from deckaloud.voicing import voice_cards
 
 STATE_DIR = Path(".deckaloud")
 DEFAULT_CONFIG = Path("deckaloud.toml")
-DEFAULT_OUTPUT = Path("deckaloud.apkg")
+COMBINED_OUTPUT = Path("deckaloud.apkg")
 DEFAULT_SAMPLES = Path("samples")
 VOICE_SETTINGS = "System Settings → Accessibility → Spoken Content → System Voice → Manage Voices"
 
@@ -59,7 +59,9 @@ def add_command(commands, name: str, run, summary: str) -> argparse.ArgumentPars
 
 def add_build(commands) -> None:
     command = add_command(commands, "build", run_build, "render audio and write the .apkg")
-    command.add_argument("-o", "--output", type=Path, default=DEFAULT_OUTPUT)
+    command.add_argument(
+        "-o", "--output", type=Path, help=f"default: <file>.apkg for one file, {COMBINED_OUTPUT} for several"
+    )
     command.add_argument("--stamp", action="store_true", help="write missing ids into the sources first")
 
 
@@ -99,10 +101,15 @@ def run_build(args: argparse.Namespace) -> int:
     cards = all_cards(sources, config)
     if not cards:
         return failure(["no cards found in the given files"])
+    output = args.output or default_output(args.files)
     voiced = voice_cards(cards, studio(config))
-    write_package(voiced, config, args.output)
-    print(format_report(voiced, args.output, forgotten_guids(args.output, voiced)))
+    write_package(voiced, config, output)
+    print(format_report(voiced, output, forgotten_guids(output, voiced)))
     return 0
+
+
+def default_output(files: list[Path]) -> Path:
+    return files[0].with_suffix(".apkg") if len(files) == 1 else COMBINED_OUTPUT
 
 
 def run_sample(args: argparse.Namespace) -> int:

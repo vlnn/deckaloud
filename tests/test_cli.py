@@ -42,7 +42,7 @@ def test_build_refuses_unstamped_cards_and_leaves_the_source_alone(project, caps
     assert code == 1, "unstamped cards should fail the build"
     assert "no id" in capsys.readouterr().err, "the failure should explain that ids are missing"
     assert (project / "geo.txt").read_text(encoding="utf-8") == UNSTAMPED, "build should not rewrite sources unasked"
-    assert not (project / "deckaloud.apkg").exists(), "a failed build should not write a package"
+    assert not list(project.rglob("*.apkg")), "a failed build should not write a package"
 
 
 def test_build_with_stamp_writes_ids_then_builds(project):
@@ -52,7 +52,42 @@ def test_build_with_stamp_writes_ids_then_builds(project):
 
     assert code == 0, "build --stamp should succeed on unstamped cards"
     assert "\nid: " in (project / "geo.txt").read_text(encoding="utf-8"), "ids should be written to the source"
-    assert (project / "deckaloud.apkg").exists(), "the default output name should be deckaloud.apkg"
+    assert (project / "geo.apkg").exists(), "the stamped source should be built into its package"
+
+
+def numbered_source(number):
+    return f"deck: Deck {number}\n\nid: card{number}\nQ: Question {number}?\nA: Answer {number}.\n"
+
+
+def write_sources(project, names):
+    for number, name in enumerate(names):
+        (project / name).parent.mkdir(parents=True, exist_ok=True)
+        write(project, name, numbered_source(number))
+
+
+@pytest.mark.parametrize(
+    "sources, options, expected",
+    [
+        (["geo.txt"], [], "geo.apkg"),
+        (["notes/geo.txt"], [], "notes/geo.apkg"),
+        (["geo.notes.txt"], [], "geo.notes.apkg"),
+        (["geo"], [], "geo.apkg"),
+        (["geo.txt", "bio.txt"], [], "deckaloud.apkg"),
+        (["geo.txt"], ["-o", "named.apkg"], "named.apkg"),
+        (["geo.txt", "bio.txt"], ["-o", "named.apkg"], "named.apkg"),
+    ],
+)
+def test_build_names_the_package_after_its_only_source_unless_told_otherwise(
+    project, capsys, sources, options, expected
+):
+    write_sources(project, sources)
+
+    code = main(["build", *sources, *options])
+
+    written = sorted(str(package.relative_to(project)) for package in project.rglob("*.apkg"))
+    assert code == 0, f"building {sources} should succeed"
+    assert written == [expected], f"building {sources} with {options} should write {expected} and nothing else"
+    assert f"into {expected}" in capsys.readouterr().out, f"the report should name {expected}"
 
 
 def test_rebuild_reports_cards_that_left_the_sources(project, capsys):
@@ -173,7 +208,7 @@ def test_build_without_cards_fails_and_writes_nothing(project, capsys):
 
     assert code == 1, "building nothing should fail"
     assert "no cards" in capsys.readouterr().err, "the failure should say there were no cards"
-    assert not Path("deckaloud.apkg").exists(), "no package should be written"
+    assert not list(project.rglob("*.apkg")), "no package should be written"
 
 
 DATA = Path(__file__).parent / "data"

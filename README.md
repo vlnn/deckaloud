@@ -51,6 +51,7 @@ C: TCP guarantees {{c1::ordered}} and {{c2::reliable}} delivery,
 deckaloud stamp  notes/*.txt                  # write missing ids into the files
 deckaloud check  notes/*.txt                  # validate, render nothing
 deckaloud sample notes/*.txt -n 3             # 3 cards per language, both sides, in every natural voice
+deckaloud build  notes/networking.txt         # writes notes/networking.apkg
 deckaloud build  notes/*.txt -o listening.apkg
 deckaloud build  --stamp notes/*.txt          # stamp, then build
 deckaloud voice  mydeck.apkg                  # add sound to an existing deck
@@ -93,6 +94,10 @@ there; the report names those note types.
 `build` refuses cards without an id instead of inventing one, because an id that
 changes later would turn a reviewed card into a new one. It only edits your files
 when you pass `--stamp`.
+
+Without `-o`, a single source file is built into a package of the same name
+beside it: `notes/networking.txt` becomes `notes/networking.apkg`. Several files
+go into one `deckaloud.apkg` in the directory you run from.
 
 Rendered clips are cached in `.deckaloud/audio`, so a rebuild only speaks what changed.
 

@@ -6,7 +6,7 @@ import pytest
 from deckaloud.cards import cards_from_source
 from deckaloud.config import Config
 from deckaloud.source import parse_source
-from deckaloud.speech import Beep, Pause, Say, Speech
+from deckaloud.speech import Beep, Pause, Say, SayIn, Speech
 
 PATH = Path("geo.txt")
 BLANK = Config()
@@ -151,3 +151,39 @@ def test_only_dangling_punctuation_is_dropped_from_spoken_fragments(sentence, co
     (card,) = cards(f"id: a\nC: {sentence}\n", config)
 
     assert card.front.speech.segments == expected, f"'{sentence}' should be spoken as {expected}"
+
+
+MONTH = "ua months:  Січень: in english?"
+
+
+def test_foreign_word_inside_a_side_gets_the_voice_of_its_script():
+    (card,) = cards(f"lang: en\n\nid: a9224079\nQ: {MONTH}\nA: January.\n")
+
+    assert card.front.text == MONTH, "front should show the question as written"
+    assert card.front.speech == Speech(
+        "en", (Say("ua months:"), SayIn("Січень:", "uk"), Say("in english?"))
+    ), "the Ukrainian word should be the only part handed to the Ukrainian voice"
+    assert card.back.speech == Speech("en", (Say("January."),)), "a one-script answer should stay one utterance"
+
+
+def test_card_language_override_keeps_the_whole_side_in_one_voice():
+    (card,) = cards(f"id: a\nlang: en\nQ: {MONTH}\nA: January.\n")
+
+    assert card.front.speech == Speech("en", (Say(MONTH),)), "a forced language should read every script itself"
+
+
+@pytest.mark.parametrize(
+    "config, front",
+    [
+        (BLANK, (Say("Протокол пропуск надійний."),)),
+        (TONE, (Say("Протокол"), Beep(), Say("надійний."))),
+    ],
+)
+def test_cloze_sides_switch_voice_for_a_foreign_term(config, front):
+    (card,) = cards("lang: uk\n\nid: a\nC: Протокол {{c1::TCP}} надійний.\n", config)
+
+    assert card.front.speech == Speech("uk", front), "the hidden term should leave a one-voice front"
+    assert card.back.speech == Speech(
+        "uk",
+        (SayIn("TCP", "en"), Pause(config.cloze_pause), Say("Протокол"), SayIn("TCP", "en"), Say("надійний.")),
+    ), "the English term should be spoken by the English voice inside the Ukrainian sentence"

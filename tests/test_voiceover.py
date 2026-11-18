@@ -10,7 +10,7 @@ import pytest
 from deckaloud.config import Language
 from deckaloud.errors import PackageError
 from deckaloud.fieldtext import field_checksum, sort_text
-from deckaloud.speech import Say, Speech
+from deckaloud.speech import Say, SayIn, Speech
 from deckaloud.voiceover import (
     ALREADY_HAS_SOUND,
     EMPTY,
@@ -51,6 +51,10 @@ def voiced(studio, tmp_path):
         ("What is <b>TCP</b>?", Speech("en", (Say("What is TCP?"),))),
         ("Столиця України?", Speech("uk", (Say("Столиця України?"),))),
         ("1991", Speech("en", (Say("1991"),))),
+        (
+            "Month <b>Січень</b> in English?",
+            Speech("en", (Say("Month"), SayIn("Січень", "uk"), Say("in English?"))),
+        ),
         ("", EMPTY),
         ('<img src="map.png">', EMPTY),
         ("word [sound:word.mp3]", ALREADY_HAS_SOUND),

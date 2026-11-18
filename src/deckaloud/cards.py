@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from deckaloud.cloze import (
     Part,
@@ -11,7 +11,7 @@ from deckaloud.cloze import (
     revealed,
 )
 from deckaloud.config import DEFAULT_GAP_WORD, Config
-from deckaloud.language import detect_language
+from deckaloud.language import detect_language, voiced_by_script
 from deckaloud.source import ClozeEntry, Entry, QaEntry, SourceFile
 from deckaloud.speech import Beep, Pause, Say, Segment, Speech
 
@@ -70,7 +70,14 @@ def qa_card(entry: QaEntry, source: SourceFile) -> Card:
 
 
 def spoken_side(text: str, entry: Entry, source: SourceFile) -> Side:
-    return Side(text, Speech(side_language(text, entry, source), (Say(text),)))
+    side = Side(text, Speech(side_language(text, entry, source), (Say(text),)))
+    return with_native_voices(side, entry, source)
+
+
+def with_native_voices(side: Side, entry: Entry, source: SourceFile) -> Side:
+    if entry.lang:
+        return side
+    return replace(side, speech=voiced_by_script(side.speech, source.lang))
 
 
 def side_language(text: str, entry: Entry, source: SourceFile) -> str:
@@ -85,8 +92,8 @@ def cloze_cards(entry: ClozeEntry, source: SourceFile, config: Config) -> tuple[
             key=f"{entry_key(entry)}-c{number}",
             deck=source.deck,
             origin=origin(entry, source),
-            front=cloze_front(parts, number, lang, config),
-            back=cloze_back(parts, number, lang, config),
+            front=with_native_voices(cloze_front(parts, number, lang, config), entry, source),
+            back=with_native_voices(cloze_back(parts, number, lang, config), entry, source),
         )
         for number in deletion_numbers(parts)
     )

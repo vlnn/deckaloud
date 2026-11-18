@@ -15,7 +15,7 @@ from deckaloud.fieldtext import (
     sort_text,
     spoken_text,
 )
-from deckaloud.language import detect_language, has_unvoiced_script
+from deckaloud.language import detect_language, has_unvoiced_script, voiced_by_script
 from deckaloud.notetypes import NoteType, field_roles, read_note_types, replayed_fields
 from deckaloud.render import Studio, render_clip
 from deckaloud.speech import Say, Speech
@@ -122,7 +122,8 @@ def field_speech(content: str, options: VoiceOptions) -> Speech | str:
         return TOO_LONG
     if has_unvoiced_script(text):
         return UNVOICED_SCRIPT
-    return Speech(detect_language(text, options.default_lang), (Say(text),))
+    speech = Speech(detect_language(text, options.default_lang), (Say(text),))
+    return voiced_by_script(speech, options.default_lang)
 
 
 def store(database: sqlite3.Connection, notes: list[VoicedNote]) -> None:

@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from deckaloud.cards import Card, cards_from_source
 from deckaloud.config import Config
 from deckaloud.source import Entry, SourceFile
+from deckaloud.speech import spoken_languages
 
 
 def problems(sources: tuple[SourceFile, ...], config: Config) -> tuple[str, ...]:
@@ -41,7 +42,7 @@ def unvoiced_languages(sources: tuple[SourceFile, ...], config: Config) -> tuple
 
 
 def unvoiced(card: Card, config: Config) -> Iterator[str]:
-    langs = dict.fromkeys(side.speech.lang for side in (card.front, card.back))
+    langs = dict.fromkeys(lang for side in (card.front, card.back) for lang in spoken_languages(side.speech))
     return (
         f"{card.origin}: no voice configured for language '{lang}'"
         for lang in langs

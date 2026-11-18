@@ -7,7 +7,7 @@ from deckaloud.audio import SAMPLE_RATE, read_frames, silence_frames, write_wav
 from deckaloud.config import Config, Language
 from deckaloud.errors import SpeechError
 from deckaloud.render import clip_name, installed_language, render_clip
-from deckaloud.speech import Beep, Pause, Say, Speech
+from deckaloud.speech import Beep, Pause, Say, SayIn, Speech
 
 HELLO = Speech("en", (Say("hello"),))
 
@@ -25,7 +25,7 @@ def test_clip_is_rendered_into_the_cache_with_the_configured_voice(studio, engin
 
     assert clip.parent == studio.cache_dir, "clip should be stored in the cache directory"
     assert clip.name == clip_name(
-        HELLO, installed_language(HELLO, studio), studio.config
+        HELLO, installed_language(HELLO.lang, studio), studio.config
     ), "clip should be named by its fingerprint"
     assert clip.suffix == ".m4a", "clip should be an m4a file"
     assert engine.spoken == [
@@ -96,6 +96,12 @@ def test_clip_name_changes_with_anything_that_changes_the_sound(language, config
     ), "a new sound should get a new name"
 
 
+def test_one_language_clip_keeps_the_name_earlier_builds_gave_it():
+    assert (
+        clip_name(HELLO, ENGLISH, Config()) == "deckaloud-3038242e372398fe3e72.m4a"
+    ), "clips already cached or imported should not be rendered again under a new name"
+
+
 def test_clip_name_is_stable_and_depends_on_text():
     assert clip_name(HELLO, ENGLISH, Config()) == clip_name(
         HELLO, ENGLISH, Config()
@@ -142,3 +148,47 @@ def test_voice_that_produces_only_silence_is_a_speech_error(studio, engine, mock
 
     assert "no sound" in str(raised.value), "a silent rendering should be reported, not baked"
     assert not list(studio.cache_dir.glob("*")), "a silent clip should not reach the cache"
+
+
+MONTH = Speech("en", (Say("ua months:"), SayIn("Січень:", "uk"), Say("in english?")))
+UKRAINIAN = Language("Lesya", "uk_UA", rate=165)
+
+
+def test_stretch_in_another_language_is_spoken_by_that_language_voice(studio, engine):
+    clip = render_clip(MONTH, studio)
+
+    assert engine.spoken == [
+        ("ua months:", "Samantha (English (US))", 175),
+        ("Січень:", "Lesya", 165),
+        ("in english?", "Samantha (English (US))", 175),
+    ], "each stretch should go to the voice and rate of its own language"
+    assert seconds(clip) == pytest.approx(
+        28 * SECONDS_PER_CHARACTER + padding(studio.config), abs=0.001
+    ), "the stretches should be joined into one clip"
+
+
+@pytest.mark.parametrize(
+    "guests",
+    [(), (replace(UKRAINIAN, voice="Lesya (Enhanced)"),), (replace(UKRAINIAN, rate=120),)],
+)
+def test_clip_name_changes_with_the_voice_of_a_foreign_stretch(guests):
+    assert clip_name(MONTH, ENGLISH, Config(), (UKRAINIAN,)) != clip_name(
+        MONTH, ENGLISH, Config(), guests
+    ), "a new sound for the foreign stretch should get a new name"
+
+
+@pytest.mark.parametrize(
+    "languages, fragment",
+    [
+        ({"en": ENGLISH}, "no voice configured for language 'uk'"),
+        ({"en": ENGLISH, "uk": Language("Missing", "uk_UA")}, "'Missing' is not installed"),
+    ],
+)
+def test_foreign_stretch_without_a_voice_is_a_speech_error(studio, languages, fragment):
+    config = replace(studio.config, languages=languages)
+
+    with pytest.raises(SpeechError) as raised:
+        render_clip(MONTH, replace(studio, config=config))
+
+    assert fragment in str(raised.value), f"error should say: {fragment}"
+    assert not list(studio.cache_dir.glob("*")), "a failed render should not leave a file in the cache"

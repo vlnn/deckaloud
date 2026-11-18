@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from deckaloud.check import problems
-from deckaloud.config import Config
+from deckaloud.config import Config, Language
 from deckaloud.source import parse_source
 
 
@@ -30,3 +30,13 @@ def test_each_problem_names_its_place(texts, fragments):
     (problem,) = problems(sources(*texts), Config())
 
     assert all(fragment in problem for fragment in fragments), f"'{problem}' should mention {fragments}"
+
+
+def test_language_of_a_foreign_stretch_needs_a_voice_too():
+    english_only = Config(languages={"en": Language("Samantha", "en_US")})
+
+    (problem,) = problems(sources("id: a\nQ: Січень in english?\nA: January.\n"), english_only)
+
+    assert all(
+        fragment in problem for fragment in ["file0.txt:1", "'uk'", "no voice"]
+    ), f"'{problem}' should name the voiceless language of the Ukrainian word"

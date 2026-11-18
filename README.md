@@ -42,6 +42,11 @@ C: TCP guarantees {{c1::ordered}} and {{c2::reliable}} delivery,
   read in the file's language when its script fits that language. A side in the
   other script falls back to English (Latin letters) or Ukrainian (Cyrillic), so
   an English term answering a Ukrainian question gets the English voice.
+- A side that mixes scripts is spoken in stretches, each by the voice of its
+  script: in `Січень: in English?` the first word goes to the Ukrainian voice
+  and the rest to the English one. Numbers and punctuation stay with the stretch
+  before them. A card-level `lang:` turns this off and reads the whole card in
+  one voice.
 - `id:` is the card's identity. Wording can change freely; the id keeps the
   schedule. Letters, digits and underscores only.
 
@@ -194,6 +199,9 @@ rather than from anything this project tests:
 - At most six languages in the settings.
 - Script detection knows two fallbacks, English and Ukrainian. For other
   languages set `lang:` in the file header or on the card.
+- The voice changes only where the script changes, so an English word inside
+  a German sentence stays with the German voice. Stretches are separate
+  utterances joined into one clip, which can sound choppier than one sentence.
 - Text is handed to `say` as written. `say` interprets embedded commands such as
   `[[rate 300]]`, so those characters are not spoken literally.
 - A cloze answer cannot contain `::`, as in Anki itself: the part after it is

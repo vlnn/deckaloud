@@ -11,7 +11,6 @@ def test_defaults_cover_english_and_ukrainian():
     assert (config.lead_in, config.tail) == (0.25, 0.5), "clips should be padded with silence by default"
     assert config.languages["uk"].voice == "Lesya", "default Ukrainian voice should be Lesya"
     assert set(config.languages) == {"en", "uk"}, "defaults should configure en and uk"
-    assert config.replay_keys == ("4",), "the 4 key should replay the audio by default"
 
 
 @pytest.mark.parametrize(
@@ -33,11 +32,6 @@ def test_defaults_cover_english_and_ukrainian():
             lambda c: c.languages["de"].gap_word,
             "blank",
         ),
-        ({"keys": {}}, lambda c: c.replay_keys, ("4",)),
-        ({"keys": {"replay": "2"}}, lambda c: c.replay_keys, ("2",)),
-        ({"keys": {"replay": ["2", "r"]}}, lambda c: c.replay_keys, ("2", "r")),
-        ({"keys": {"replay": ["ArrowUp"]}}, lambda c: c.replay_keys, ("ArrowUp",)),
-        ({"keys": {"replay": []}}, lambda c: c.replay_keys, ()),
     ],
 )
 def test_mapping_overrides_only_what_it_names(data, read, expected):
@@ -54,11 +48,6 @@ def test_mapping_overrides_only_what_it_names(data, read, expected):
         ({"languages": {"DE": {"voice": "V", "locale": "de_DE"}}}, "language code"),
         ({"languages": {"de": {"voice": "V", "locale": "}}{{Front"}}}, "locale"),
         ({"languages": {"en": {"locale": "en US"}}}, "locale"),
-        ({"keys": {"replay": 4}}, "keys.replay"),
-        ({"keys": {"replay": [4]}}, "keys.replay"),
-        ({"keys": {"replay": ["4", ""]}}, "keys.replay"),
-        ({"keys": {"replay": ""}}, "keys.replay"),
-        ({"keys": {"replay": False}}, "keys.replay"),
         (
             {"languages": {code: {"voice": "V", "locale": "xx_XX"} for code in ("aa", "bb", "cc", "dd", "ee")}},
             "at most 6",

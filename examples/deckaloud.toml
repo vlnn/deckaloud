@@ -13,9 +13,6 @@ frequency = 880
 duration = 0.25
 padding = 0.15
 
-[keys]
-replay = ["4"]
-
 [languages.en]
 voice = "Samantha"
 locale = "en_US"

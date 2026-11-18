@@ -10,7 +10,6 @@ from deckaloud.errors import ConfigError
 GAP_STYLES = ("blank", "tone")
 DEFAULT_GAP_WORD = "blank"
 MAX_LANGUAGES = 6
-DEFAULT_REPLAY_KEYS = ("4",)
 LANGUAGE_CODE = re.compile(r"^[a-z]{2,3}$")
 LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]+)*$")
 
@@ -46,7 +45,6 @@ class Config:
     engine: str = "say"
     tone: ToneShape = ToneShape()
     languages: Mapping[str, Language] = field(default_factory=default_languages)
-    replay_keys: tuple[str, ...] = DEFAULT_REPLAY_KEYS
 
 
 def load_config(path: Path) -> Config:
@@ -66,7 +64,6 @@ def config_from_mapping(data: Mapping[str, Any]) -> Config:
         engine=data.get("engine", defaults.engine),
         tone=replace(defaults.tone, **known(ToneShape, data.get("tone", {}))),
         languages=merged_languages(defaults.languages, data.get("languages", {})),
-        replay_keys=replay_keys(data.get("keys", {}).get("replay", defaults.replay_keys)),
     )
 
 
@@ -74,17 +71,6 @@ def gap_style(style: str) -> str:
     if style not in GAP_STYLES:
         raise ConfigError(f"gap.style must be one of {', '.join(GAP_STYLES)}, got '{style}'")
     return style
-
-
-def replay_keys(value: Any) -> tuple[str, ...]:
-    keys = [value] if isinstance(value, str) else value
-    if not is_key_list(keys):
-        raise ConfigError(f'keys.replay must be a quoted key or a list of them, like "4" or ["4", "r"], got {value!r}')
-    return tuple(keys)
-
-
-def is_key_list(keys: Any) -> bool:
-    return isinstance(keys, (list, tuple)) and all(isinstance(key, str) and key for key in keys)
 
 
 def merged_languages(

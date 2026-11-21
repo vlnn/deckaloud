@@ -20,7 +20,7 @@ def located_entries(sources: tuple[SourceFile, ...]) -> Iterator[tuple[str, Entr
 
 def missing_ids(sources: tuple[SourceFile, ...]) -> tuple[str, ...]:
     return tuple(
-        f"{place}: card has no id; run 'deckaloud stamp' or build with --stamp"
+        f"{place}: card has no id; run 'deckaloud stamp', or build without --no-stamp"
         for place, entry in located_entries(sources)
         if entry.id is None
     )

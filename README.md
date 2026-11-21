@@ -60,11 +60,53 @@ C: TCP guarantees {{c1::ordered}} and {{c2::reliable}} delivery,
 deckaloud stamp  notes/*.txt                  # write missing ids into the files
 deckaloud check  notes/*.txt                  # validate, render nothing
 deckaloud sample notes/*.txt -n 3             # 3 cards per language, both sides, in every natural voice
-deckaloud build  notes/networking.txt         # writes notes/networking.apkg
+deckaloud build  notes/networking.txt         # stamps, then writes notes/networking.apkg
 deckaloud build  notes/*.txt -o listening.apkg
-deckaloud build  --stamp notes/*.txt          # stamp, then build
+deckaloud build  --no-stamp notes/*.txt       # fail on cards without ids instead of writing them
 deckaloud voice  mydeck.apkg                  # add sound to an existing deck
 ```
+
+## A decks directory
+
+Without file arguments, the commands work on a whole directory of decks: `--dir`,
+else `$DECKS_DIR`, else `~/decks`.
+
+```sh
+decks build      # build what changed, voice what was dropped into inbox/
+decks rebuild    # build everything again and regenerate all audio
+decks status     # show what is new, changed, waiting for import or deleted
+decks add 'booo is {{c1::doo}}'    # append a card to test.txt
+```
+
+| Path | What it holds |
+|---|---|
+| `*.txt`, also in subfolders | deck sources |
+| `test.txt` | the deck `add` appends to |
+| `inbox/` | third-party `.apkg` files waiting to be voiced |
+| `originals/` | those packages, unvoiced, moved here once voiced |
+| `toanki/` | built and voiced packages, `state.json`, `decks.log`, the audio cache |
+| `deckaloud.toml` | settings for this directory |
+
+- `build` stamps every source, then rebuilds a deck only when its content hash
+  differs from the one in `toanki/state.json` or its package is missing.
+- A deck that fails its checks is skipped and reported; the others are still
+  built, and the failed deck keeps its last good package. The exit status is 1.
+- An id used in two decks fails the later one.
+- A package in `inbox/` is voiced into `toanki/originals/` and its original moves
+  to `originals/`. If voicing fails it stays in `inbox/`.
+- Deleting a source deletes its package. Its note ids stay in `state.json`,
+  marked for removal from Anki.
+- `rebuild` ignores `state.json` and empties the audio cache first.
+- `add` takes a cloze sentence, or `Q:` and `A:` lines, or several cards
+  separated by blank lines. Text that is not a valid card is rejected and
+  nothing is written.
+- The last line of `build` and `rebuild` is a summary such as
+  `built 2, unchanged 5, removed 0, failed 0`. The full report of the last run
+  is in `toanki/decks.log`.
+- When the directory is a git repository, files whose new `id:` lines are not
+  committed are named, as a reminder to commit them.
+- Only one command works on a directory at a time; a second one stops with
+  `already running`.
 
 ## Adding sound to a deck you already have
 
@@ -100,9 +142,10 @@ answer clip on the back. A note type whose answer template repeats the question
 field, instead of using `{{FrontSide}}`, will play the question clip again
 there; the report names those note types.
 
-`build` refuses cards without an id instead of inventing one, because an id that
-changes later would turn a reviewed card into a new one. It only edits your files
-when you pass `--stamp`.
+`build` writes an `id:` line into the source for every card that has none, and
+never changes an id that is already there: the id is what ties a card to its
+review history, so one that changed later would turn a reviewed card into a new
+one. With `--no-stamp` it leaves your files alone and refuses cards without an id.
 
 Without `-o`, a single source file is built into a package of the same name
 beside it: `notes/networking.txt` becomes `notes/networking.apkg`. Several files

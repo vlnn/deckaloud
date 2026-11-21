@@ -34,10 +34,10 @@ def test_build_writes_an_apkg_and_reports(project, capsys):
     assert "Built 2 cards into geo.apkg, all sides baked." in capsys.readouterr().out, "build should print its report"
 
 
-def test_build_refuses_unstamped_cards_and_leaves_the_source_alone(project, capsys):
+def test_build_without_stamping_refuses_unstamped_cards_and_leaves_the_source_alone(project, capsys):
     source = write(project, "geo.txt", UNSTAMPED)
 
-    code = main(["build", source])
+    code = main(["build", "--no-stamp", source])
 
     assert code == 1, "unstamped cards should fail the build"
     assert "no id" in capsys.readouterr().err, "the failure should explain that ids are missing"
@@ -45,12 +45,13 @@ def test_build_refuses_unstamped_cards_and_leaves_the_source_alone(project, caps
     assert not list(project.rglob("*.apkg")), "a failed build should not write a package"
 
 
-def test_build_with_stamp_writes_ids_then_builds(project):
+@pytest.mark.parametrize("options", [[], ["--stamp"]])
+def test_build_writes_missing_ids_then_builds(project, options):
     source = write(project, "geo.txt", UNSTAMPED)
 
-    code = main(["build", "--stamp", source])
+    code = main(["build", *options, source])
 
-    assert code == 0, "build --stamp should succeed on unstamped cards"
+    assert code == 0, "build should stamp unstamped cards and succeed"
     assert "\nid: " in (project / "geo.txt").read_text(encoding="utf-8"), "ids should be written to the source"
     assert (project / "geo.apkg").exists(), "the stamped source should be built into its package"
 

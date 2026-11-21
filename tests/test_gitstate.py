@@ -42,6 +42,12 @@ def test_only_files_with_ids_missing_from_the_last_commit_are_listed(repo, name,
     assert files_with_uncommitted_ids(repo) == expected, f"uncommitted ids should be found in {expected}"
 
 
+def test_untracked_file_that_is_not_text_is_ignored(repo):
+    (repo / "binary.txt").write_bytes(b"\xff\xfe\x00 not text")
+
+    assert files_with_uncommitted_ids(repo) == (), "a file that cannot be read as text should hold no ids"
+
+
 def test_directory_outside_git_has_nothing_to_commit(tmp_path):
     (tmp_path / "geo.txt").write_text(COMMITTED, encoding="utf-8")
 

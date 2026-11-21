@@ -2,7 +2,9 @@ from collections import Counter
 from pathlib import Path
 
 from deckaloud.building import is_current, is_third_party
+from deckaloud.errors import SourceError
 from deckaloud.ledger import Ledger, digest
+from deckaloud.source import read_source_text
 from deckaloud.stamp import stamp_text
 from deckaloud.workspace import Workspace
 
@@ -44,7 +46,14 @@ def deck_state(path: Path, workspace: Workspace, ledger: Ledger) -> str:
 
 
 def has_unstamped_cards(path: Path) -> bool:
-    return path.suffix == ".txt" and stamp_text(path.read_text(encoding="utf-8-sig"))[1] > 0
+    return path.suffix == ".txt" and unstamped_count(path) > 0
+
+
+def unstamped_count(path: Path) -> int:
+    try:
+        return stamp_text(read_source_text(path))[1]
+    except SourceError:
+        return 1
 
 
 def deleted_state(name: str) -> str:

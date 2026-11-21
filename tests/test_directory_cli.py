@@ -2,7 +2,9 @@ import fcntl
 
 import pytest
 from conftest import copy_as_encoding
+from fake_anki import FakeAnki
 
+from deckaloud.ankiconnect import AnkiUnreachable
 from deckaloud.cli import main
 from deckaloud.ledger import read_ledger
 from deckaloud.workspace import Workspace
@@ -22,6 +24,18 @@ def decks(tmp_path, monkeypatch, mocker, engine):
     mocker.patch("deckaloud.cli.engine_named", return_value=engine)
     mocker.patch("deckaloud.cli.encode_m4a", side_effect=copy_as_encoding)
     return Workspace(root)
+
+
+@pytest.fixture
+def anki(mocker):
+    fake = FakeAnki()
+    mocker.patch("deckaloud.cli.connected_anki", return_value=fake)
+    return fake
+
+
+def numbered_deck(count):
+    cards = "".join(f"\nid: g{number}\nQ: Question {number}?\nA: Answer {number}.\n" for number in range(count))
+    return f"deck: Geo\n{cards}"
 
 
 def write(workspace, name, text):
@@ -91,7 +105,7 @@ def test_missing_directory_is_an_error(decks, capsys):
     assert "decks directory not found" in capsys.readouterr().err, "the error should say what is missing"
 
 
-@pytest.mark.parametrize("command", [["build"], ["rebuild"], ["add", "x {{c1::y}}"]])
+@pytest.mark.parametrize("command", [["build"], ["rebuild"], ["sync"], ["add", "x {{c1::y}}"]])
 def test_second_run_is_refused_while_one_is_working(decks, capsys, command):
     decks.toanki.mkdir()
     with open(decks.lock_file, "w") as holder:
@@ -140,3 +154,84 @@ def test_added_cards_are_built_with_the_rest(decks, capsys):
 
     assert code == 0, "the test deck should build like any other"
     assert decks.package_for("test.txt").exists(), "the test deck should have its package"
+
+
+def test_sync_builds_imports_and_ends_with_a_summary(decks, anki, capsys):
+    write(decks, "geo.txt", GEO)
+
+    code = main(["sync", "--dir", str(decks.root)])
+    printed = capsys.readouterr().out
+
+    assert code == 0, "a clean sync should exit with 0"
+    assert anki.guids() == {"deckaloud-a1"}, "the card should arrive in Anki"
+    assert last_line(printed) == "built 1, imported 1, removed 0, failed 0", "the last line should be the summary"
+    assert read_ledger(decks.ledger_file)["geo.txt"].imported, "the import should be recorded"
+    assert printed.strip() in decks.log_file.read_text(encoding="utf-8"), "the log should hold the same report"
+
+
+def test_sync_after_a_build_only_imports(decks, anki, capsys, engine):
+    write(decks, "geo.txt", GEO)
+    main(["build", "--dir", str(decks.root)])
+    spoken = len(engine.spoken)
+    capsys.readouterr()
+
+    code = main(["sync", "--dir", str(decks.root)])
+
+    assert code == 0, "sync after a build should succeed"
+    assert last_line(capsys.readouterr().out) == "built 0, imported 1, removed 0, failed 0", "nothing should be built again"
+    assert len(engine.spoken) == spoken, "no speech should be synthesized again"
+
+
+def test_second_sync_has_nothing_to_do(decks, anki, capsys):
+    write(decks, "geo.txt", GEO)
+    main(["sync", "--dir", str(decks.root)])
+    capsys.readouterr()
+
+    code = main(["sync", "--dir", str(decks.root)])
+
+    assert code == 0, "a sync with nothing to do should succeed"
+    assert capsys.readouterr().out.strip() == "built 0, imported 0, removed 0, failed 0", "only the summary should print"
+    assert anki.called("importPackage") == 1, "nothing should be imported twice"
+
+
+@pytest.mark.parametrize(
+    "options, code, left, summary",
+    [
+        ([], 1, 10, "built 1, imported 0, removed 0, failed 1"),
+        (["--force"], 0, 3, "built 1, imported 1, removed 7, failed 0"),
+    ],
+)
+def test_large_deletion_waits_for_force(decks, anki, capsys, options, code, left, summary):
+    write(decks, "geo.txt", numbered_deck(10))
+    main(["sync", "--dir", str(decks.root)])
+    write(decks, "geo.txt", numbered_deck(3))
+    capsys.readouterr()
+
+    result = main(["sync", *options, "--dir", str(decks.root)])
+    printed = capsys.readouterr().out
+
+    assert result == code, f"the sync should exit with {code}"
+    assert len(anki.guids()) == left, f"{left} cards should be left in Anki"
+    assert last_line(printed) == summary, f"the summary should read '{summary}'"
+
+
+def test_failed_build_is_reported_once_and_fails_the_sync(decks, anki, capsys):
+    write(decks, "geo.txt", BROKEN)
+
+    code = main(["sync", "--dir", str(decks.root)])
+    printed = capsys.readouterr().out
+
+    assert code == 1, "a deck that does not build should fail the sync"
+    assert printed.count("geo.txt: failed") == 1, "the failure should be listed once"
+    assert last_line(printed) == "built 0, imported 0, removed 0, failed 1", "the summary should count it once"
+
+
+def test_unreachable_anki_fails_but_keeps_what_was_built(decks, mocker, capsys):
+    mocker.patch("deckaloud.cli.connected_anki", side_effect=AnkiUnreachable("Anki did not answer"))
+    write(decks, "geo.txt", GEO)
+
+    code = main(["sync", "--dir", str(decks.root)])
+
+    assert code == 1, "sync should fail when Anki cannot be reached"
+    assert "Anki did not answer" in capsys.readouterr().err, "the error should say why"
+    assert read_ledger(decks.ledger_file)["geo.txt"].imported is False, "the built deck should wait for the next sync"

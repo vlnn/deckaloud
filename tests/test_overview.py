@@ -57,6 +57,14 @@ def test_known_source_is_reported_by_what_it_still_needs(workspace, text, change
     assert lines == (expected or ["nothing to do"]), f"the overview should read {expected}"
 
 
+def test_source_that_is_not_text_is_listed_for_building(workspace):
+    (workspace.root / "binary.txt").write_bytes(b"\xff\xfe\x00 not text")
+
+    lines = overview_lines(workspace, {"binary.txt": Entry(digest(workspace.root / "binary.txt"), True)})
+
+    assert lines[0] == "binary.txt: changed", "an unreadable source should be left for build to report"
+
+
 def test_overview_changes_nothing(workspace):
     source = write(workspace, "geo.txt", UNSTAMPED)
 

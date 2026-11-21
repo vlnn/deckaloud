@@ -2,17 +2,25 @@ import argparse
 import os
 import sqlite3
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from deckaloud.building import build_workspace, outcome_lines, summary
+from deckaloud.ankiconnect import (
+    Anki,
+    AnkiConnect,
+    launch_anki,
+    running_anki,
+    short_nap,
+)
+from deckaloud.building import Outcome, build_workspace, outcome_lines, summary
 from deckaloud.cards import Card, cards_from_source
 from deckaloud.check import problems
 from deckaloud.config import Config, load_config
 from deckaloud.engines import encode_m4a, engine_named
 from deckaloud.errors import DeckaloudError
 from deckaloud.gitstate import files_with_uncommitted_ids
-from deckaloud.ledger import read_ledger, write_ledger
+from deckaloud.ledger import Ledger, read_ledger, write_ledger
 from deckaloud.lockfile import exclusive
 from deckaloud.overview import overview_lines
 from deckaloud.package import write_package
@@ -28,6 +36,7 @@ from deckaloud.sample import (
 )
 from deckaloud.source import SourceFile, parse_source, read_source_text
 from deckaloud.stamp import stamp_file
+from deckaloud.syncing import Synced, sync_workspace
 from deckaloud.voiceover import VoiceOptions, format_voice_report, voice_package
 from deckaloud.voicing import voice_cards
 from deckaloud.workspace import Workspace, workspace_root
@@ -55,6 +64,7 @@ def parser() -> argparse.ArgumentParser:
     add_voice(commands)
     add_directory_command(commands, "rebuild", run_rebuild, "rebuild every deck in the decks directory, audio included")
     add_directory_command(commands, "status", run_status, "show what the decks directory still needs")
+    add_sync(commands)
     add_quick_add(commands)
     add_command(commands, "stamp", run_stamp, "write missing card ids into the source files")
     add_command(commands, "check", run_check, "validate source files without rendering audio")
@@ -86,6 +96,11 @@ def add_build(commands) -> None:
     )
     command.add_argument("--stamp", action="store_true", help="accepted for compatibility; ids are written by default")
     command.add_argument("--no-stamp", action="store_true", help="fail on cards without ids instead of writing them")
+
+
+def add_sync(commands) -> None:
+    command = add_directory_command(commands, "sync", run_sync, "build what changed, then bring Anki up to date")
+    command.add_argument("--force", action="store_true", help="let a deck lose more than a fifth of its cards")
 
 
 def add_quick_add(commands) -> None:
@@ -129,13 +144,45 @@ def run_rebuild(args: argparse.Namespace) -> int:
 def build_directory(args: argparse.Namespace, fresh: bool) -> int:
     workspace = chosen_workspace(args)
     with exclusive(workspace.lock_file):
-        booth = studio(load_config(workspace.config_file), workspace.audio_cache)
-        ledger, outcomes = build_workspace(workspace, booth, read_ledger(workspace.ledger_file), fresh)
-        write_ledger(workspace.ledger_file, ledger)
-    lines = [*outcome_lines(outcomes), *uncommitted_ids_note(workspace), summary(outcomes)]
+        _, outcomes = built_ledger(workspace, fresh)
+    return reported(workspace, outcomes, summary(outcomes))
+
+
+def built_ledger(workspace: Workspace, fresh: bool) -> tuple[Ledger, tuple[Outcome, ...]]:
+    booth = studio(load_config(workspace.config_file), workspace.audio_cache)
+    ledger, outcomes = build_workspace(workspace, booth, read_ledger(workspace.ledger_file), fresh)
+    write_ledger(workspace.ledger_file, ledger)
+    return ledger, outcomes
+
+
+def reported(workspace: Workspace, outcomes: tuple[Outcome, ...], last_line: str) -> int:
+    lines = [*outcome_lines(outcomes), *uncommitted_ids_note(workspace), last_line]
     keep_log(workspace, lines)
     print("\n".join(lines))
-    return 1 if any(outcome.state == "failed" for outcome in outcomes) else 0
+    return 1 if failures(outcomes) else 0
+
+
+def failures(outcomes: tuple[Outcome, ...]) -> frozenset[str]:
+    return frozenset(outcome.name for outcome in outcomes if outcome.state == "failed")
+
+
+def run_sync(args: argparse.Namespace) -> int:
+    workspace = chosen_workspace(args)
+    with exclusive(workspace.lock_file):
+        ledger, built = built_ledger(workspace, fresh=False)
+        uncommitted = frozenset(files_with_uncommitted_ids(workspace.root))
+        synced = sync_workspace(workspace, connected_anki(), ledger, failures(built), uncommitted, args.force)
+        write_ledger(workspace.ledger_file, synced.ledger)
+    return reported(workspace, (*built, *synced.outcomes), sync_summary(built, synced))
+
+
+def sync_summary(built: tuple[Outcome, ...], synced: Synced) -> str:
+    counts = Counter(outcome.state for outcome in (*built, *synced.outcomes))
+    return f"built {counts['built']}, imported {counts['imported']}, removed {synced.deleted}, failed {counts['failed']}"
+
+
+def connected_anki() -> Anki:
+    return running_anki(AnkiConnect(), launch_anki, short_nap)
 
 
 def run_status(args: argparse.Namespace) -> int:

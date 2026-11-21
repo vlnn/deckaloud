@@ -37,4 +37,4 @@ def untracked_files_with_ids(root: Path) -> set[str]:
 
 
 def has_ids(path: Path) -> bool:
-    return any(line.startswith(ID_LINE) for line in path.read_text(encoding="utf-8-sig").splitlines())
+    return any(line.startswith(ID_LINE) for line in path.read_text(encoding="utf-8-sig", errors="replace").splitlines())

@@ -4,7 +4,13 @@ from pathlib import Path
 from deckaloud.check import unvoiced_languages
 from deckaloud.config import Config
 from deckaloud.errors import DeckaloudError
-from deckaloud.source import Block, block_keys, parse_source, split_blocks
+from deckaloud.source import (
+    Block,
+    block_keys,
+    parse_source,
+    read_source_text,
+    split_blocks,
+)
 from deckaloud.stamp import stamp_text
 
 HEADER = "deck: Test\n"
@@ -24,7 +30,7 @@ def add_cards(deck: Path, typed: str, config: Config) -> int:
 
 
 def existing_text(deck: Path) -> str:
-    return deck.read_text(encoding="utf-8-sig") if deck.exists() else HEADER
+    return read_source_text(deck) if deck.exists() else HEADER
 
 
 def as_cards(typed: str) -> str:

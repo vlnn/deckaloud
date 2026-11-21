@@ -120,6 +120,16 @@ def test_broken_deck_is_skipped_and_the_rest_are_built(workspace, booth):
     assert any("geo.txt:3" in message for message in outcomes[0].messages), "the failure should say where it is"
 
 
+def test_source_that_is_not_text_fails_alone(workspace, booth):
+    (workspace.root / "binary.txt").write_bytes(b"\xff\xfe\x00 not text")
+    write(workspace, "net.txt", NET)
+
+    _, outcomes = build_workspace(workspace, booth, {})
+
+    assert states(outcomes) == {"binary.txt": "failed", "net.txt": "built"}, "an unreadable source should fail alone"
+    assert "not UTF-8" in outcomes[0].messages[0], "the failure should say the file is not text"
+
+
 def test_deck_that_breaks_keeps_its_last_good_package(workspace, booth):
     write(workspace, "geo.txt", GEO)
     ledger, _ = build_workspace(workspace, booth, {})

@@ -3,8 +3,9 @@
 Sound-first Anki decks. Text files in, one `.apkg` out, every card spoken, so a
 deck can be reviewed by ear with a keyboard or remote.
 
-macOS only: speech comes from `say`, encoding from `afconvert`. Nothing talks to
-Anki; the only output is the `.apkg` you import yourself.
+macOS only: speech comes from `say`, encoding from `afconvert`. The output is an
+`.apkg` you import yourself, or `decks sync` imports it for you through the
+AnkiConnect add-on.
 
 ## Install
 
@@ -75,6 +76,7 @@ else `$DECKS_DIR`, else `~/decks`.
 decks build      # build what changed, voice what was dropped into inbox/
 decks rebuild    # build everything again and regenerate all audio
 decks status     # show what is new, changed, waiting for import or deleted
+decks sync       # build if needed, then bring Anki up to date
 decks add 'booo is {{c1::doo}}'    # append a card to test.txt
 ```
 
@@ -107,6 +109,38 @@ decks add 'booo is {{c1::doo}}'    # append a card to test.txt
   committed are named, as a reminder to commit them.
 - Only one command works on a directory at a time; a second one stops with
   `already running`.
+
+### sync
+
+`decks sync` needs the [AnkiConnect](https://ankiweb.net/shared/info/2055492159)
+add-on. It starts Anki if it is not running, and then:
+
+1. Builds what `build` would build. Decks that are already built are not built
+   again.
+2. Imports every package that is waiting.
+3. Reads the deck's notes back from Anki and corrects any whose text differs
+   from the package, because Anki's import does not always update a note that
+   already exists. Cards are moved to the deck named in their source.
+4. Deletes notes that are no longer in any source. A card moved to another
+   source file keeps its note and its schedule.
+5. Removes the notes of a deleted source, and its deck if that is now empty.
+6. Starts Anki's own sync.
+
+The sources are the truth: an edit made inside Anki is overwritten the next time
+that deck changes.
+
+Deletion is limited in four ways:
+
+- Only notes that sync itself imported are ever deleted, and only notes tagged
+  `deckaloud-…`. Packages from `originals/` are imported and never cleaned.
+- A deck that would lose more than a fifth of its cards, and more than five, is
+  left alone and reported as failed until you run `decks sync --force`.
+- A deck whose new `id:` lines are not committed to git keeps its deleted cards
+  in Anki until they are. `test.txt` is exempt.
+- A deck that failed to build is neither imported nor cleaned.
+
+The summary reads `built 1, imported 1, removed 2, failed 0`, where `removed`
+counts deleted notes. Try it first on a spare Anki profile.
 
 ## Adding sound to a deck you already have
 
@@ -269,3 +303,7 @@ uv run --with anki python scripts/verify_import.py first.apkg second.apkg
 
 The second command imports packages into a throwaway Anki collection and prints
 the cards, which is how import and update behaviour was checked.
+
+`PYTHONPATH=tests uv run --with anki python scripts/verify_sync.py` runs the
+sync logic against a throwaway collection of the real `anki` library, through
+an adapter that mirrors AnkiConnect's own code.

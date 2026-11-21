@@ -4,7 +4,13 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
-from deckaloud.source import CARD_KEYS, Block, block_keys, read_source_text, split_blocks
+from deckaloud.source import (
+    CARD_KEYS,
+    Block,
+    block_keys,
+    read_source_text,
+    split_blocks,
+)
 
 
 def random_id() -> str:

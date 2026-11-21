@@ -9,11 +9,11 @@ from pathlib import Path
 from deckaloud.cards import cards_from_source
 from deckaloud.check import problems, reused_ids
 from deckaloud.config import Config
-from deckaloud.errors import DeckaloudError, ParseError
+from deckaloud.errors import DeckaloudError, ParseError, SourceError
 from deckaloud.ledger import Entry, Ledger, digest
 from deckaloud.package import write_package
 from deckaloud.render import Studio
-from deckaloud.source import SourceFile, parse_source
+from deckaloud.source import SourceFile, parse_source, read_source_text
 from deckaloud.stamp import stamp_file
 from deckaloud.voiceover import VoiceOptions, voice_package
 from deckaloud.voicing import voice_cards
@@ -43,35 +43,51 @@ def build_workspace(
     if fresh:
         shutil.rmtree(workspace.audio_cache, ignore_errors=True)
     voiced = dropped_results(workspace, studio)
-    results = (*text_results(workspace, studio, known), *voiced, *kept_results(workspace, studio, known, voiced))
+    texts = text_results(workspace, studio, known, ledger)
+    results = (*texts, *voiced, *kept_results(workspace, studio, known, voiced))
     built = {**ledger, **{result.outcome.name: result.entry for result in results if result.entry}}
     present = {result.outcome.name for result in results}
     gone = tuple(name for name, entry in built.items() if name not in present and not entry.removed)
     return without(built, gone), (*(result.outcome for result in results), *removals(workspace, gone))
 
 
-def text_results(workspace: Workspace, studio: Studio, known: Ledger) -> tuple[Result, ...]:
+def text_results(workspace: Workspace, studio: Studio, known: Ledger, ledger: Ledger) -> tuple[Result, ...]:
     names = [workspace.name(path) for path in workspace.sources()]
-    for name in names:
-        stamp_file(workspace.root / name)
     readings = {name: read_source(workspace, name) for name in names}
     shared = reused_ids(tuple(reading for reading in readings.values() if isinstance(reading, SourceFile)))
-    return tuple(text_result(name, readings[name], shared, workspace, studio, known) for name in names)
+    return tuple(
+        text_result(name, readings[name], shared, workspace, studio, known.get(name), in_anki(ledger.get(name)))
+        for name in names
+    )
+
+
+def in_anki(entry: Entry | None) -> tuple[str, ...]:
+    return entry.anki_guids if entry else ()
 
 
 def read_source(workspace: Workspace, name: str) -> SourceFile | str:
+    path = workspace.root / name
     try:
-        return parse_source((workspace.root / name).read_text(encoding="utf-8-sig"), Path(name))
+        stamp_file(path)
+        return parse_source(read_source_text(path), Path(name))
+    except SourceError:
+        return f"{name} is not UTF-8 text, so it cannot be read as a source file"
     except ParseError as error:
         return str(error)
 
 
 def text_result(
-    name: str, reading: SourceFile | str, shared: tuple[str, ...], workspace: Workspace, studio: Studio, known: Ledger
+    name: str,
+    reading: SourceFile | str,
+    shared: tuple[str, ...],
+    workspace: Workspace,
+    studio: Studio,
+    known: Entry | None,
+    anki_guids: tuple[str, ...],
 ) -> Result:
     current = digest(workspace.root / name)
     package = workspace.package_for(name)
-    if is_current(known.get(name), current, package):
+    if is_current(known, current, package):
         return Result(Outcome(name, "unchanged"))
     found = (reading,) if isinstance(reading, str) else deck_problems(reading, shared, studio.config)
     if found:
@@ -81,7 +97,8 @@ def text_result(
         return failed(name, (f"{name}: no cards found",))
     package.parent.mkdir(parents=True, exist_ok=True)
     write_package(voice_cards(cards, studio), studio.config, package)
-    return Result(Outcome(name, "built"), Entry(current, False, tuple(card.guid for card in cards)))
+    guids = tuple(card.guid for card in cards)
+    return Result(Outcome(name, "built"), Entry(current, False, guids, deck=reading.deck, anki_guids=anki_guids))
 
 
 def is_current(entry: Entry | None, current: str, package: Path) -> bool:

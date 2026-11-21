@@ -14,6 +14,10 @@ Needs macOS, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/).
 uv tool install .        # or: uv run deckaloud ...
 ```
 
+This installs two names for the same command, `deckaloud` and the shorter `decks`.
+After pulling changes, refresh the installed copy with
+`uv tool install --force --reinstall .`
+
 ## Source files
 
 One file is one deck. Blocks are separated by blank lines.

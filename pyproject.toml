@@ -8,6 +8,7 @@ dependencies = ["genanki>=0.13"]
 
 [project.scripts]
 deckaloud = "deckaloud.cli:main"
+decks = "deckaloud.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-mock>=3.14"]
